@@ -5,8 +5,8 @@
   <title>Kirka Social Feed</title>
   <meta property="og:title" content="Kirka Social Feed" />
   <meta property="og:description" content="This page has some really cool stuff you'll want to see." />
-  <meta property="og:image" content="" />
-  <meta property="og:url" content="hthttps://vectorified.com/images/google-sheets-icon-29.png" />
+  <meta property="og:image" content="https://vectorified.com/images/google-sheets-icon-29.png" />
+  <meta property="og:url" content="https://kirka-feed.github.io/Social/" />
   <meta property="og:type" content="website" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
@@ -29,11 +29,28 @@
       padding: 1rem;
     }
     .post {
-      background: #1f2937;
       border-radius: 10px;
       padding: 1rem;
       margin-bottom: 1rem;
       box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      background-color: #1f2937;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      position: relative;
+      color: white;
+    }
+    .post::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.6); /* dark overlay for readability */
+      border-radius: 10px;
+      z-index: 0;
+    }
+    .post * {
+      position: relative;
+      z-index: 1;
     }
     .post-header {
       display: flex;
@@ -125,7 +142,7 @@
   </style>
 </head>
 <body>
-  <header>Kirka Social feed</header>
+  <header>Kirka Social Feed</header>
   <div class="feed" id="feed">
     Loading posts...
   </div>
@@ -167,30 +184,30 @@
               ${post.Role}
             </span>` : '';
 
+          const altText = post['alt-text'] || 'No description';
           let imageHTML = '';
-          if(post.Image) {
-            const altText = post['alt-text'] || 'No description';
-            if(post.url) {
-              imageHTML = `
-                <div class="image-container" tabindex="0">
-                  <a href="${post.url}" target="_blank" rel="noopener noreferrer">
-                    <img src="${post.Image}" class="image" alt="${altText}" />
-                  </a>
-                  <span class="tooltip">${altText}</span>
-                </div>
-              `;
-            } else {
-              imageHTML = `
-                <div class="image-container" tabindex="0">
+          if (post.Image && post.url) {
+            imageHTML = `
+              <div class="image-container" tabindex="0">
+                <a href="${post.url}" target="_blank" rel="noopener noreferrer">
                   <img src="${post.Image}" class="image" alt="${altText}" />
-                  <span class="tooltip">${altText}</span>
-                </div>
-              `;
-            }
+                </a>
+                <span class="tooltip">${altText}</span>
+              </div>`;
+          } else if (post.Image) {
+            imageHTML = `
+              <div class="image-container" tabindex="0">
+                <img src="${post.Image}" class="image" alt="${altText}" />
+                <span class="tooltip">${altText}</span>
+              </div>`;
           }
 
           const postEl = document.createElement("div");
           postEl.className = "post";
+          if (post.Image) {
+            postEl.style.backgroundImage = `url(${post.Image})`;
+          }
+
           postEl.innerHTML = `
             <div class="post-header">
               <img src="${userImage}" alt="avatar" class="avatar" onerror="this.onerror=null;this.src='${fallbackAvatar}';" />
