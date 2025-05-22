@@ -189,21 +189,21 @@ async function loadPosts() {
     const postsMap = {};
     const repliesMap = {};
 
+    // Collect posts & replies by user or role filters
     data.forEach(post => {
       const isReply = post.ReplyTo && post.ReplyTo.trim() !== "";
-      const key = isReply ? post.ReplyTo.trim() : post.Text.trim();
 
-      // Replies map (for threading)
+      // Filter logic for role pages
+      if (isRoleView && post.Role !== roleFilter) return;
+
+      // Filter logic for profile pages:
+      // Include any post (main or reply) by the user
+      if (isProfileView && post.User !== usernameFilter) return;
+
       if (isReply) {
-        if (!repliesMap[key]) repliesMap[key] = [];
-        repliesMap[key].push(post);
+        if (!repliesMap[post.ReplyTo.trim()]) repliesMap[post.ReplyTo.trim()] = [];
+        repliesMap[post.ReplyTo.trim()].push(post);
       } else {
-        // Filter by username if posts= query param set
-        if (isProfileView && post.User !== usernameFilter) return;
-
-        // Filter by role if role= query param set
-        if (isRoleView && post.Role !== roleFilter) return;
-
         postsMap[post.Text.trim()] = post;
       }
     });
@@ -253,6 +253,7 @@ async function loadPosts() {
         ${imageHTML}
       `;
 
+      // Render nested replies only if this post has replies
       const replies = repliesMap[post.Text?.trim()];
       if (replies && replies.length > 0) {
         const repliesEl = document.createElement("div");
@@ -266,33 +267,51 @@ async function loadPosts() {
       return postEl;
     }
 
-    const postList = Object.values(postsMap).reverse();
+    // Combine main posts and replies (for profile view)
+    let combinedPosts = [];
 
-    // Profile view header with total posts count
-    if (isProfileView && postList.length > 0) {
-      const profilePost = postList[0];
+    if (isProfileView) {
+      // For profile view, combine all posts and replies by user into one list and sort by date or order in sheet (if available)
+      // Since there is no date field in the sample, we use order from the sheet (data array order)
+      combinedPosts = data.filter(post => post.User === usernameFilter);
+    } else {
+      // For role view or default, just show postsMap values filtered by role or nothing else
+      combinedPosts = Object.values(postsMap);
+    }
+
+    // Reverse to show newest first
+    combinedPosts.reverse();
+
+    // Show profile header with total posts count for profile view
+    if (isProfileView && combinedPosts.length > 0) {
+      const profilePost = combinedPosts[0];
       const badgeColor = roleColors[profilePost.Role] || "#5865f2";
       const userImage = profilePost["user-image"]?.trim() || fallbackAvatar;
-      const totalPosts = postList.length;
+      const totalPosts = combinedPosts.length;
 
       document.getElementById("profileHeader").innerHTML = `
         <img src="${userImage}" class="avatar" style="border-color:${badgeColor}" />
         <div class="username">${profilePost.User}</div>
         <div class="badge" style="background-color:${badgeColor}">${profilePost.Role || 'User'}</div>
         <div style="margin-top: 6px; font-size: 0.9rem; color: #ccc;">
-          Total Posts: ${totalPosts}
+          Total Posts (incl. replies): ${totalPosts}
         </div>
       `;
       document.getElementById("profileHeader").style.display = "block";
     } else {
-      // Hide profile header if not profile view
       document.getElementById("profileHeader").style.display = "none";
     }
 
-    // Render all filtered posts
-    postList.forEach(mainPost => {
-      feed.appendChild(renderPost(mainPost));
+    // Render all posts (and replies nested by renderPost)
+    combinedPosts.forEach(post => {
+      // To avoid duplicate display of replies as main posts (because replies are also included in combinedPosts),
+      // only render posts that are NOT replies or that have no ReplyTo field
+      // (because replies will be nested under their parent post)
+      if (post.ReplyTo && post.ReplyTo.trim() !== "") return;
+
+      feed.appendChild(renderPost(post));
     });
+
   } catch (e) {
     document.getElementById("feed").textContent = "Failed to load posts.";
     console.error(e);
