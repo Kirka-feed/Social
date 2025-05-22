@@ -197,7 +197,7 @@ function getQueryParam(param) {
 }
 
 async function getProfileViews(user) {
-  const counterId = `feedprofile_${user}`;
+  const counterId = `kfeed_${user}`;
   try {
     const res = await fetch(`https://api.api-ninjas.com/v1/counter?id=${counterId}&hit=true`, {
       headers: { 'X-Api-Key': API_NINJAS_KEY }
