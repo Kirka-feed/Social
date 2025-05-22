@@ -149,7 +149,7 @@
   <script>
 const SHEET_ID = '1ikyDtsWpTu-CspRoKitH6nFtgnB8XPUXytJDc9Q1vO8';
 const SHEET_URL = `https://opensheet.elk.sh/${SHEET_ID}/Sheet1`;
-const API_NINJAS_KEY = 'audFnhc9Z9ZK3Xzc8W2VHQ==OgCqFBFjoebp0NMN'; // Replace with your actual key
+const API_NINJAS_KEY = 'audFnhc9Z9ZK3Xzc8W2VHQ==OgCqFBFjoebp0NMN';
 
 const roleColors = {
   "Youtuber": "#FF0000",
@@ -163,33 +163,22 @@ const roleColors = {
   "r/kirka": "#FF5700"
 };
 
+const fallbackAvatar = "https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain";
+
 function parseMarkdown(text) {
   if (!text) return "";
-
   return text
-    // Escape HTML to prevent injection
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    // Headings: #, ##, ### (only up to h3 for simplicity)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/^### (.*$)/gim, "<h3>$1</h3>")
     .replace(/^## (.*$)/gim, "<h2>$1</h2>")
     .replace(/^# (.*$)/gim, "<h1>$1</h1>")
-    // Bold **text**
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    // Italic *text*
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    // Underline __text__
     .replace(/__(.*?)__/g, "<u>$1</u>")
-    // Strikethrough ~~text~~
     .replace(/~~(.*?)~~/g, "<del>$1</del>")
-    // Inline code `text`
     .replace(/`(.*?)`/g, "<code>$1</code>")
-    // Links [text](url)
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 }
-  
-const fallbackAvatar = "https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain";
 
 function getQueryParam(param) {
   const params = new URLSearchParams(window.location.search);
@@ -217,7 +206,12 @@ async function loadPosts() {
 
     const usernameFilter = getQueryParam("posts");
     const roleFilter = getQueryParam("role");
+    const postIndexRaw = getQueryParam("post");
+    const specificUser = getQueryParam("user");
     const isProfileView = !!usernameFilter;
+
+    const postIndex = postIndexRaw ? parseInt(postIndexRaw, 10) - 1 : null;
+    const isSinglePostView = !isNaN(postIndex) && specificUser;
 
     const postsMap = {};
     const repliesMap = {};
@@ -239,18 +233,17 @@ async function loadPosts() {
     const feed = document.getElementById("feed");
     feed.innerHTML = '';
 
-    function renderPost(post) {
+    function renderPost(post, indexForUser = null) {
       const userImage = post["user-image"]?.trim() || fallbackAvatar;
       const badgeColor = roleColors[post.Role] || "#5865f2";
-      let roleDisplay = post.Role;
-
       let badge = '';
-      if (roleDisplay) {
-        const urlRole = roleDisplay.replaceAll("/", "").replaceAll(" ", "");
+
+      if (post.Role) {
+        const urlRole = post.Role.replaceAll("/", "").replaceAll(" ", "");
         badge = `
-          <a href="?role=${encodeURIComponent(urlRole)}" class="badge" title="${roleDisplay}" style="background-color: ${badgeColor}; text-decoration: none;">
+          <a href="?role=${encodeURIComponent(urlRole)}" class="badge" title="${post.Role}" style="background-color: ${badgeColor}; text-decoration: none;">
             ${post.verified === "*" ? '<svg class="verified-icon" viewBox="0 0 16 16" width="12" height="12" xmlns="http://www.w3.org/2000/svg"><path d="M6.00039 11.2002L3.33372 8.53353L2.60039 9.26686L6.00039 12.6669L14.0004 4.66686L13.2671 3.93353L6.00039 11.2002Z"/></svg>' : ''}
-            ${roleDisplay}
+            ${post.Role}
           </a>`;
       }
 
@@ -270,6 +263,11 @@ async function loadPosts() {
           </div>`;
       }
 
+      const copyButton = indexForUser !== null ? `
+        <button onclick="copyPostLink('${post.User}', ${indexForUser})" style="margin-top: 8px; font-size: 12px; background: #21262d; border: 1px solid #444; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+          Copy Link
+        </button>` : '';
+
       const postEl = document.createElement("div");
       postEl.className = `post${post.Image ? ' with-image' : ''}`;
       postEl.innerHTML = `
@@ -282,6 +280,7 @@ async function loadPosts() {
         </div>
         <div class="content">${parseMarkdown(post.Text)}</div>
         ${imageHTML}
+        ${copyButton}
       `;
 
       const replies = repliesMap[post.Text?.trim()];
@@ -297,7 +296,12 @@ async function loadPosts() {
       return postEl;
     }
 
-    const postList = Object.values(postsMap).reverse();
+    let postList = Object.values(postsMap).reverse();
+
+    if (isSinglePostView) {
+      const userPosts = postList.filter(p => p.User === specificUser);
+      postList = userPosts[postIndex] ? [userPosts[postIndex]] : [];
+    }
 
     if (isProfileView && postList.length > 0) {
       const profilePost = postList[0];
@@ -314,14 +318,57 @@ async function loadPosts() {
       document.getElementById("profileHeader").style.display = "block";
     }
 
-    postList.forEach(mainPost => {
-      feed.appendChild(renderPost(mainPost));
+    postList.forEach((mainPost, i) => {
+      const userPosts = postList.filter(p => p.User === mainPost.User);
+      const indexForUser = userPosts.findIndex(p => p === mainPost);
+      feed.appendChild(renderPost(mainPost, indexForUser));
     });
   } catch (e) {
     document.getElementById("feed").textContent = "Failed to load posts.";
     console.error(e);
   }
 }
+
+function copyPostLink(user, index) {
+  const baseUrl = window.location.origin + window.location.pathname;
+  const fullUrl = `${baseUrl}?post=${index + 1}&user=${encodeURIComponent(user)}`;
+  navigator.clipboard.writeText(fullUrl).then(() => {
+    // Create tooltip
+    const tooltip = document.createElement("div");
+    tooltip.textContent = "Copied!";
+    tooltip.style.position = "fixed";
+    tooltip.style.bottom = "20px";
+    tooltip.style.left = "50%";
+    tooltip.style.transform = "translateX(-50%)";
+    tooltip.style.background = "#28a745";
+    tooltip.style.color = "white";
+    tooltip.style.padding = "6px 12px";
+    tooltip.style.borderRadius = "4px";
+    tooltip.style.boxShadow = "0 2px 6px rgba(0,0,0,0.2)";
+    tooltip.style.fontSize = "14px";
+    tooltip.style.zIndex = 9999;
+    tooltip.style.opacity = 0;
+    tooltip.style.transition = "opacity 0.3s ease";
+
+    document.body.appendChild(tooltip);
+
+    // Fade in
+    requestAnimationFrame(() => {
+      tooltip.style.opacity = 1;
+    });
+
+    // Fade out and remove
+    setTimeout(() => {
+      tooltip.style.opacity = 0;
+      setTimeout(() => {
+        tooltip.remove();
+      }, 300);
+    }, 1000);
+  }).catch(err => {
+    console.error("Copy failed", err);
+  });
+}
+
 
 loadPosts();
 setInterval(loadPosts, 15000);
