@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Referral Example</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background: #f0f0f0;
+      text-align: center;
+    }
+    #referral-message {
+      margin-top: 20px;
+      font-size: 1.5rem;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome to the Website</h1>
+  <div id="referral-message"></div>
+
+  <script>
+    // Get the URL parameters
+    const params = new URLSearchParams(window.location.search);
+    // Check if referral parameter exists
+    const referral = params.get('referral');
+
+    if (referral) {
+      // Display the referral message
+      document.getElementById('referral-message').textContent = `Invited by ${referral}`;
+    }
+  </script>
+</body>
+</html>
