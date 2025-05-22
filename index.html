@@ -175,11 +175,16 @@ async function loadPosts() {
     const data = await res.json();
 
     const usernameFilter = getQueryParam("posts");
-    let roleFilter = getQueryParam("role");
-    if (roleFilter === "rKirka") {
-      roleFilter = "r/kirka";
+    const roleFilterRaw = getQueryParam("role");
+
+    // Normalize role filter for r/kirka special case
+    let roleFilter = null;
+    if (roleFilterRaw) {
+      roleFilter = roleFilterRaw.toLowerCase() === "rkirka" ? "r/kirka" : roleFilterRaw;
     }
+
     const isProfileView = !!usernameFilter;
+    const isRoleView = !!roleFilter;
 
     const postsMap = {};
     const repliesMap = {};
@@ -188,16 +193,18 @@ async function loadPosts() {
       const isReply = post.ReplyTo && post.ReplyTo.trim() !== "";
       const key = isReply ? post.ReplyTo.trim() : post.Text.trim();
 
+      // Replies map (for threading)
       if (isReply) {
         if (!repliesMap[key]) repliesMap[key] = [];
         repliesMap[key].push(post);
       } else {
-        if (
-          (!usernameFilter || post.User === usernameFilter) &&
-          (!roleFilter || post.Role === roleFilter)
-        ) {
-          postsMap[post.Text.trim()] = post;
-        }
+        // Filter by username if posts= query param set
+        if (isProfileView && post.User !== usernameFilter) return;
+
+        // Filter by role if role= query param set
+        if (isRoleView && post.Role !== roleFilter) return;
+
+        postsMap[post.Text.trim()] = post;
       }
     });
 
@@ -209,16 +216,12 @@ async function loadPosts() {
         ? post["user-image"]
         : fallbackAvatar;
 
-      // Normalize role for URL (r/kirka => rKirka)
-      let roleForUrl = post.Role;
-      if (post.Role === "r/kirka") roleForUrl = "rKirka";
-
       const badgeColor = roleColors[post.Role] || "#5865f2";
       const badge = post.Role ? `
-        <a href="?role=${encodeURIComponent(roleForUrl)}" class="badge" title="${post.Role}" style="background-color: ${badgeColor}; color: white; text-decoration:none;">
+        <span class="badge" title="${post.Role}" style="background-color: ${badgeColor}; cursor:pointer;" onclick="window.location='?role=${encodeURIComponent(post.Role.toLowerCase() === 'r/kirka' ? 'rkirka' : post.Role)}'">
           ${post.verified === "*" ? '<svg class="verified-icon" viewBox="0 0 16 16" width="12" height="12" xmlns="http://www.w3.org/2000/svg"><path d="M6.00039 11.2002L3.33372 8.53353L2.60039 9.26686L6.00039 12.6669L14.0004 4.66686L13.2671 3.93353L6.00039 11.2002Z"/></svg>' : ''}
           ${post.Role}
-        </a>` : '';
+        </span>` : '';
 
       const altText = post['alt-text'] || 'No description';
       let imageHTML = '';
@@ -265,20 +268,28 @@ async function loadPosts() {
 
     const postList = Object.values(postsMap).reverse();
 
+    // Profile view header with total posts count
     if (isProfileView && postList.length > 0) {
       const profilePost = postList[0];
       const badgeColor = roleColors[profilePost.Role] || "#5865f2";
       const userImage = profilePost["user-image"]?.trim() || fallbackAvatar;
+      const totalPosts = postList.length;
+
       document.getElementById("profileHeader").innerHTML = `
         <img src="${userImage}" class="avatar" style="border-color:${badgeColor}" />
         <div class="username">${profilePost.User}</div>
         <div class="badge" style="background-color:${badgeColor}">${profilePost.Role || 'User'}</div>
+        <div style="margin-top: 6px; font-size: 0.9rem; color: #ccc;">
+          Total Posts: ${totalPosts}
+        </div>
       `;
       document.getElementById("profileHeader").style.display = "block";
     } else {
+      // Hide profile header if not profile view
       document.getElementById("profileHeader").style.display = "none";
     }
 
+    // Render all filtered posts
     postList.forEach(mainPost => {
       feed.appendChild(renderPost(mainPost));
     });
