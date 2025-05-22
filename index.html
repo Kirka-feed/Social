@@ -168,7 +168,9 @@ const fallbackAvatar = "https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA
 function parseMarkdown(text) {
   if (!text) return "";
   return text
+    // basic HTML escape
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    // headers & formatting
     .replace(/^### (.*$)/gim, "<h3>$1</h3>")
     .replace(/^## (.*$)/gim, "<h2>$1</h2>")
     .replace(/^# (.*$)/gim, "<h1>$1</h1>")
@@ -177,8 +179,16 @@ function parseMarkdown(text) {
     .replace(/__(.*?)__/g, "<u>$1</u>")
     .replace(/~~(.*?)~~/g, "<del>$1</del>")
     .replace(/`(.*?)`/g, "<code>$1</code>")
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    )
+    .replace(
+      /\{(.*?)\}\[(.*?)\]/g,
+      '<span style="color:$2">$1</span>'
+    );
 }
+
 
 function getQueryParam(param) {
   const params = new URLSearchParams(window.location.search);
