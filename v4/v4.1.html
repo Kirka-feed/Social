@@ -171,7 +171,7 @@ function getQueryParam(param) {
 }
 
 async function getProfileViews(user) {
-  const safeUser = user.replaceAll("/", "L"); // Replace / with -
+  const safeUser = user.replaceAll("-", " "); // Replace / with -
   const counterId = `profile_${safeUser}_profile`;
   try {
     const res = await fetch(`https://api.api-ninjas.com/v1/counter?id=${counterId}&hit=true`, {
@@ -185,6 +185,25 @@ async function getProfileViews(user) {
   }
 }
 
+async function getPostViews(postText) {
+  const safeText = postText
+    .replace(/[^\w\s]/g, '') // Remove all special characters
+    .replace(/\s+/g, '_')    // Replace spaces with underscores
+    .substring(0, 60);       // Limit length for safety
+
+  const counterId = `post_${safeText}`;
+  try {
+    const res = await fetch(`https://api.api-ninjas.com/v1/counter?id=${counterId}&hit=true`, {
+      headers: { 'X-Api-Key': API_NINJAS_KEY }
+    });
+    const data = await res.json();
+    return data.value;
+  } catch (err) {
+    console.error('Post view counter error:', err);
+    return null;
+  }
+}
+    
 async function loadPosts() {
   try {
     const res = await fetch(SHEET_URL);
