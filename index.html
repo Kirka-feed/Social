@@ -164,6 +164,7 @@ const roleColors = {
 };
 
 function parseMarkdown(text) {
+function parseMarkdown(text) {
   if (!text) return "";
 
   return text
@@ -171,6 +172,10 @@ function parseMarkdown(text) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
+    // Headings: #, ##, ### (only up to h3 for simplicity)
+    .replace(/^### (.*$)/gim, "<h3>$1</h3>")
+    .replace(/^## (.*$)/gim, "<h2>$1</h2>")
+    .replace(/^# (.*$)/gim, "<h1>$1</h1>")
     // Bold **text**
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     // Italic *text*
@@ -184,8 +189,7 @@ function parseMarkdown(text) {
     // Links [text](url)
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
 }
-
-
+  
 const fallbackAvatar = "https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain";
 
 function getQueryParam(param) {
