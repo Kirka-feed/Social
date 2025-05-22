@@ -171,7 +171,8 @@ function getQueryParam(param) {
 }
 
 async function getProfileViews(user) {
-  const counterId = `profile_${user}`;
+  const safeUser = user.replaceAll("/", "-"); // Replace / with -
+  const counterId = `profile_${safeUser}_profile`;
   try {
     const res = await fetch(`https://api.api-ninjas.com/v1/counter?id=${counterId}&hit=true`, {
       headers: { 'X-Api-Key': API_NINJAS_KEY }
