@@ -171,8 +171,7 @@ function getQueryParam(param) {
 }
 
 async function getProfileViews(user) {
-  const safeUser = user.replaceAll("-", " "); // Replace / with -
-  const counterId = `profile_${safeUser}_profile`;
+  const counterId = `profile_${user}`;
   try {
     const res = await fetch(`https://api.api-ninjas.com/v1/counter?id=${counterId}&hit=true`, {
       headers: { 'X-Api-Key': API_NINJAS_KEY }
@@ -184,7 +183,7 @@ async function getProfileViews(user) {
     return null;
   }
 }
-    
+
 async function loadPosts() {
   try {
     const res = await fetch(SHEET_URL);
