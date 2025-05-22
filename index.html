@@ -2,12 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Kirka Social Feed</title>
-  <meta property="og:title" content="Kirka Social Feed" />
-  <meta property="og:description" content="This page has some really cool stuff you'll want to see." />
-  <meta property="og:image" content="https://vectorified.com/images/google-sheets-icon-29.png" />
-  <meta property="og:url" content="https://kirka-feed.github.io/Social/" />
-  <meta property="og:type" content="website" />
+  <title>Kirka Social Feed with Replies</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
@@ -34,23 +29,19 @@
       margin-bottom: 1rem;
       box-shadow: 0 2px 4px rgba(0,0,0,0.5);
       background-color: #1f2937;
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
       position: relative;
       color: white;
     }
-    .post::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: rgba(0,0,0,0.6); /* dark overlay for readability */
-      border-radius: 10px;
-      z-index: 0;
+    .post.with-image {
+      background-image: url('https://th.bing.com/th/id/R.5f75f44c76c442dd38b83b188b29ca44?rik=ytkhMSke1Oyldg&pid=ImgRaw&r=0');
+      background-size: cover;
+      background-position: center;
     }
-    .post * {
-      position: relative;
-      z-index: 1;
+    .replies {
+      margin-left: 1.5rem;
+      border-left: 2px solid #333;
+      padding-left: 1rem;
+      margin-top: 0.5rem;
     }
     .post-header {
       display: flex;
@@ -69,7 +60,6 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      flex-wrap: wrap;
     }
     .username {
       font-weight: bold;
@@ -84,15 +74,9 @@
       padding: 1px 3px;
       border-radius: 4px;
       line-height: 1;
-      max-width: 50px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
     .verified-icon {
-      display: inline-block;
       vertical-align: middle;
-      margin-right: 3px;
       flex-shrink: 0;
       fill: white;
     }
@@ -104,10 +88,6 @@
       position: relative;
       display: inline-block;
       cursor: pointer;
-    }
-    .image-container:focus {
-      outline: 2px solid #3f83f8;
-      outline-offset: 2px;
     }
     .tooltip {
       position: absolute;
@@ -122,14 +102,8 @@
       pointer-events: none;
       transition: opacity 0.3s ease;
       max-width: 150px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      user-select: none;
-      z-index: 10;
     }
-    .image-container:hover .tooltip,
-    .image-container:focus-within .tooltip {
+    .image-container:hover .tooltip {
       opacity: 1;
       pointer-events: auto;
     }
@@ -143,9 +117,7 @@
 </head>
 <body>
   <header>Kirka Social Feed</header>
-  <div class="feed" id="feed">
-    Loading posts...
-  </div>
+  <div class="feed" id="feed">Loading posts...</div>
 
   <script>
     const SHEET_ID = '1ikyDtsWpTu-CspRoKitH6nFtgnB8XPUXytJDc9Q1vO8';
@@ -169,16 +141,30 @@
       try {
         const res = await fetch(SHEET_URL);
         const data = await res.json();
+
+        const postsMap = {};
+        const repliesMap = {};
+
+        data.forEach(post => {
+          const isReply = post.ReplyTo && post.ReplyTo.trim() !== "";
+          const key = isReply ? post.ReplyTo.trim() : post.Text.trim();
+          if (isReply) {
+            if (!repliesMap[key]) repliesMap[key] = [];
+            repliesMap[key].push(post);
+          } else {
+            postsMap[post.Text.trim()] = post;
+          }
+        });
+
         const feed = document.getElementById("feed");
         feed.innerHTML = '';
 
-        [...data].reverse().forEach(post => {
+        function renderPost(post) {
           const userImage = post["user-image"] && post["user-image"].trim() !== ""
             ? post["user-image"]
             : fallbackAvatar;
 
           const badgeColor = roleColors[post.Role] || "#5865f2";
-
           const badge = post.Role ? `
             <span class="badge" title="${post.Role}" style="background-color: ${badgeColor}">
               ${post.verified === "*" ? '<svg class="verified-icon" viewBox="0 0 16 16" width="12" height="12" xmlns="http://www.w3.org/2000/svg"><path d="M6.00039 11.2002L3.33372 8.53353L2.60039 9.26686L6.00039 12.6669L14.0004 4.66686L13.2671 3.93353L6.00039 11.2002Z"/></svg>' : ''}
@@ -189,29 +175,23 @@
           let imageHTML = '';
           if (post.Image && post.url) {
             imageHTML = `
-              <div class="image-container" tabindex="0">
-                <a href="${post.url}" target="_blank" rel="noopener noreferrer">
-                  <img src="${post.Image}" class="image" alt="${altText}" />
-                </a>
+              <div class="image-container">
+                <a href="${post.url}" target="_blank"><img src="${post.Image}" class="image" alt="${altText}" /></a>
                 <span class="tooltip">${altText}</span>
               </div>`;
           } else if (post.Image) {
             imageHTML = `
-              <div class="image-container" tabindex="0">
+              <div class="image-container">
                 <img src="${post.Image}" class="image" alt="${altText}" />
                 <span class="tooltip">${altText}</span>
               </div>`;
           }
 
           const postEl = document.createElement("div");
-          postEl.className = "post";
-          if (post.Image) {
-            postEl.style.backgroundImage = `url(${post.Image})`;
-          }
-
+          postEl.className = `post${post.Image ? ' with-image' : ''}`;
           postEl.innerHTML = `
             <div class="post-header">
-              <img src="${userImage}" alt="avatar" class="avatar" onerror="this.onerror=null;this.src='${fallbackAvatar}';" />
+              <img src="${userImage}" class="avatar" onerror="this.onerror=null;this.src='${fallbackAvatar}'" />
               <span class="username-badge">
                 <span class="username">${post.User}</span>
                 ${badge}
@@ -220,7 +200,22 @@
             <div class="content">${post.Text}</div>
             ${imageHTML}
           `;
-          feed.appendChild(postEl);
+
+          const replies = repliesMap[post.Text?.trim()];
+          if (replies && replies.length > 0) {
+            const repliesEl = document.createElement("div");
+            repliesEl.className = "replies";
+            replies.forEach(reply => {
+              repliesEl.appendChild(renderPost(reply));
+            });
+            postEl.appendChild(repliesEl);
+          }
+
+          return postEl;
+        }
+
+        Object.values(postsMap).reverse().forEach(mainPost => {
+          feed.appendChild(renderPost(mainPost));
         });
       } catch (e) {
         document.getElementById("feed").textContent = "Failed to load posts.";
