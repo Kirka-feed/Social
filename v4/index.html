@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-    <title>Kirka Social Feed</title>
+  <title>Kirka Social Feed</title>
   <meta property="og:title" content="Kirka Social Feed" />
   <meta property="og:description" content="This page has some really cool stuff you'll want to see." />
   <meta property="og:image" content="https://vectorified.com/images/google-sheets-icon-29.png" />
@@ -118,10 +118,32 @@
       border-radius: 8px;
       display: block;
     }
+
+    #profileHeader {
+      display: none;
+      text-align: center;
+      padding: 2rem 1rem 1rem;
+      border-bottom: 1px solid #2f3542;
+    }
+    #profileHeader .avatar {
+      width: 80px;
+      height: 80px;
+      border-width: 3px;
+      margin-bottom: 0.5rem;
+    }
+    #profileHeader .username {
+      font-size: 1.25rem;
+    }
+    #profileHeader .badge {
+      margin-top: 0.3rem;
+      font-size: 10px;
+      padding: 2px 6px;
+    }
   </style>
 </head>
 <body>
   <header>Kirka Social Feed</header>
+  <div id="profileHeader"></div>
   <div class="feed" id="feed">Loading posts...</div>
 
   <script>
@@ -153,6 +175,7 @@
         const data = await res.json();
 
         const usernameFilter = getQueryParam("posts");
+        const isProfileView = !!usernameFilter;
 
         const postsMap = {};
         const repliesMap = {};
@@ -228,7 +251,20 @@
           return postEl;
         }
 
-        Object.values(postsMap).reverse().forEach(mainPost => {
+        const postList = Object.values(postsMap).reverse();
+        if (isProfileView && postList.length > 0) {
+          const profilePost = postList[0];
+          const badgeColor = roleColors[profilePost.Role] || "#5865f2";
+          const userImage = profilePost["user-image"]?.trim() || fallbackAvatar;
+          document.getElementById("profileHeader").innerHTML = `
+            <img src="${userImage}" class="avatar" style="border-color:${badgeColor}" />
+            <div class="username">${profilePost.User}</div>
+            <div class="badge" style="background-color:${badgeColor}">${profilePost.Role || 'User'}</div>
+          `;
+          document.getElementById("profileHeader").style.display = "block";
+        }
+
+        postList.forEach(mainPost => {
           feed.appendChild(renderPost(mainPost));
         });
       } catch (e) {
