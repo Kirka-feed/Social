@@ -148,8 +148,25 @@
 
   <script>
     const SHEET_ID = '1ikyDtsWpTu-CspRoKitH6nFtgnB8XPUXytJDc9Q1vO8';
-const SHEET_URL = `https://opensheet.elk.sh/${SHEET_ID}/Sheet1`;
-const API_NINJAS_KEY = 'audFnhc9Z9ZK3Xzc8W2VHQ==OgCqFBFjoebp0NMN'; // Replace with your actual key
+    const SHEET_URL = `https://opensheet.elk.sh/${SHEET_ID}/Sheet1`;
+    const API_NINJAS_KEY = 'audFnhc9Z9ZK3Xzc8W2VHQ==OgCqFBFjoebp0NMN'; // Replace with your actual key
+    const BLOG_JSON_URL = 'https://git.xargana.tr/glitchy/blog/raw/branch/main/index.json';
+
+const blogRes = await fetch(BLOG_JSON_URL);
+const blogData = await blogRes.json();
+
+blogData.forEach(blog => {
+  const text = `[${blog.title}](${blog.url})`;
+  postsMap[text] = {
+    User: "Glitchy",
+    Role: "developer",
+    verified: "*",
+    "user-image": "https://i.ibb.co/5XZZMTHV/9e6f4200ad1fa9008ea3a65046b0b925.png",
+    Text: text,
+    "alt-text": `Commit: ${blog.last_commit}, Date: ${new Date(blog.commit_date).toLocaleString()}`,
+    url: blog.url
+  };
+});
 
 const roleColors = {
   "Youtuber": "#FF0000",
@@ -171,7 +188,7 @@ function getQueryParam(param) {
 }
 
 async function getProfileViews(user) {
-  const counterId = `profile_${user}`;
+  const counterId = `Profile_${user}_Profile`;
   try {
     const res = await fetch(`https://api.api-ninjas.com/v1/counter?id=${counterId}&hit=true`, {
       headers: { 'X-Api-Key': API_NINJAS_KEY }
