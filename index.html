@@ -162,7 +162,14 @@ const roleColors = {
   "Banned": "#ff0000",
   "r/kirka": "#FF5700"
 };
-
+    
+function parseMarkdown(text) {
+      if (!text) return "";
+      return text
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") // bold **text**
+        .replace(/\*(.*?)\*/g, "<em>$1</em>");           // italics *text*
+    }
+    
 const fallbackAvatar = "https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain";
 
 function getQueryParam(param) {
