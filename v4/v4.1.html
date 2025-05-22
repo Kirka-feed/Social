@@ -148,130 +148,168 @@
 
   <script>
     const SHEET_ID = '1ikyDtsWpTu-CspRoKitH6nFtgnB8XPUXytJDc9Q1vO8';
-    const SHEET_URL = `https://opensheet.elk.sh/${SHEET_ID}/Sheet1`;
+const SHEET_URL = `https://opensheet.elk.sh/${SHEET_ID}/Sheet1`;
 
-    const roleColors = {
-      "Youtuber": "#FF0000",
-      "Streamer": "#800080",
-      "KMM": "#ffc107",
-      "Game Admin": "#0F7D0F",
-      "Game Owner": "#3B71E3",
-      "developer": "#FF5722",
-      "Juicer": "#ff9800",
-      "Banned": "#ff0000",
-      "r/kirka": "#FF5700"
-    };
+const roleColors = {
+  "Youtuber": "#FF0000",
+  "Streamer": "#800080",
+  "KMM": "#ffc107",
+  "Game Admin": "#0F7D0F",
+  "Game Owner": "#3B71E3",
+  "developer": "#FF5722",
+  "Juicer": "#ff9800",
+  "Banned": "#ff0000",
+  "r/kirka": "#FF5700"
+};
 
-    const fallbackAvatar = "https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain";
+const fallbackAvatar = "https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain";
 
-    function getQueryParam(param) {
-      const params = new URLSearchParams(window.location.search);
-      return params.get(param);
+function getQueryParam(param) {
+  const params = new URLSearchParams(window.location.search);
+  return params.get(param);
+}
+
+async function loadPosts() {
+  try {
+    const res = await fetch(SHEET_URL);
+    const data = await res.json();
+
+    const usernameFilter = getQueryParam("posts");
+    const roleFilter = getQueryParam("role");
+    const isProfileView = !!usernameFilter;
+    const isRoleView = !!roleFilter;
+
+    // Handle ?role={role} to list all users with that role
+    if (isRoleView) {
+      // Get unique users with the requested role
+      const usersWithRole = {};
+      data.forEach(post => {
+        if (post.Role === roleFilter) {
+          usersWithRole[post.User] = post;
+        }
+      });
+
+      const feed = document.getElementById("feed");
+      feed.innerHTML = `<h2 style="text-align:center; margin-bottom:1rem;">Users with role: ${roleFilter}</h2>`;
+
+      Object.values(usersWithRole).forEach(userPost => {
+        const badgeColor = roleColors[userPost.Role] || "#5865f2";
+        const userImage = userPost["user-image"]?.trim() || fallbackAvatar;
+
+        const userCard = document.createElement("div");
+        userCard.className = "post";
+        userCard.innerHTML = `
+          <div class="post-header">
+            <img src="${userImage}" class="avatar" onerror="this.onerror=null;this.src='${fallbackAvatar}'" />
+            <span class="username-badge">
+              <a href="?posts=${encodeURIComponent(userPost.User)}" class="username" style="color:inherit; text-decoration:none;">${userPost.User}</a>
+              <span class="badge" style="background-color:${badgeColor}">${userPost.Role}</span>
+            </span>
+          </div>
+        `;
+        feed.appendChild(userCard);
+      });
+
+      return; // done rendering role list, skip normal posts
     }
 
-    async function loadPosts() {
-      try {
-        const res = await fetch(SHEET_URL);
-        const data = await res.json();
+    // Original logic for posts or profile view
 
-        const usernameFilter = getQueryParam("posts");
-        const isProfileView = !!usernameFilter;
+    const postsMap = {};
+    const repliesMap = {};
 
-        const postsMap = {};
-        const repliesMap = {};
-
-        data.forEach(post => {
-          const isReply = post.ReplyTo && post.ReplyTo.trim() !== "";
-          const key = isReply ? post.ReplyTo.trim() : post.Text.trim();
-          if (isReply) {
-            if (!repliesMap[key]) repliesMap[key] = [];
-            repliesMap[key].push(post);
-          } else {
-            if (!usernameFilter || post.User === usernameFilter) {
-              postsMap[post.Text.trim()] = post;
-            }
-          }
-        });
-
-        const feed = document.getElementById("feed");
-        feed.innerHTML = '';
-
-        function renderPost(post) {
-          const userImage = post["user-image"] && post["user-image"].trim() !== ""
-            ? post["user-image"]
-            : fallbackAvatar;
-
-          const badgeColor = roleColors[post.Role] || "#5865f2";
-          const badge = post.Role ? `
-            <span class="badge" title="${post.Role}" style="background-color: ${badgeColor}">
-              ${post.verified === "*" ? '<svg class="verified-icon" viewBox="0 0 16 16" width="12" height="12" xmlns="http://www.w3.org/2000/svg"><path d="M6.00039 11.2002L3.33372 8.53353L2.60039 9.26686L6.00039 12.6669L14.0004 4.66686L13.2671 3.93353L6.00039 11.2002Z"/></svg>' : ''}
-              ${post.Role}
-            </span>` : '';
-
-          const altText = post['alt-text'] || 'No description';
-          let imageHTML = '';
-          if (post.Image && post.url) {
-            imageHTML = `
-              <div class="image-container">
-                <a href="${post.url}" target="_blank"><img src="${post.Image}" class="image" alt="${altText}" /></a>
-                <span class="tooltip">${altText}</span>
-              </div>`;
-          } else if (post.Image) {
-            imageHTML = `
-              <div class="image-container">
-                <img src="${post.Image}" class="image" alt="${altText}" />
-                <span class="tooltip">${altText}</span>
-              </div>`;
-          }
-
-          const postEl = document.createElement("div");
-          postEl.className = `post${post.Image ? ' with-image' : ''}`;
-          postEl.innerHTML = `
-            <div class="post-header">
-              <img src="${userImage}" class="avatar" onerror="this.onerror=null;this.src='${fallbackAvatar}'" />
-              <span class="username-badge">
-                <a href="?posts=${encodeURIComponent(post.User)}" class="username" style="color:inherit; text-decoration:none;">${post.User}</a>
-                ${badge}
-              </span>
-            </div>
-            <div class="content">${post.Text}</div>
-            ${imageHTML}
-          `;
-
-          const replies = repliesMap[post.Text?.trim()];
-          if (replies && replies.length > 0) {
-            const repliesEl = document.createElement("div");
-            repliesEl.className = "replies";
-            replies.forEach(reply => {
-              repliesEl.appendChild(renderPost(reply));
-            });
-            postEl.appendChild(repliesEl);
-          }
-
-          return postEl;
+    data.forEach(post => {
+      const isReply = post.ReplyTo && post.ReplyTo.trim() !== "";
+      const key = isReply ? post.ReplyTo.trim() : post.Text.trim();
+      if (isReply) {
+        if (!repliesMap[key]) repliesMap[key] = [];
+        repliesMap[key].push(post);
+      } else {
+        if (!usernameFilter || post.User === usernameFilter) {
+          postsMap[post.Text.trim()] = post;
         }
-
-        const postList = Object.values(postsMap).reverse();
-        if (isProfileView && postList.length > 0) {
-          const profilePost = postList[0];
-          const badgeColor = roleColors[profilePost.Role] || "#5865f2";
-          const userImage = profilePost["user-image"]?.trim() || fallbackAvatar;
-          document.getElementById("profileHeader").innerHTML = `
-            <img src="${userImage}" class="avatar" style="border-color:${badgeColor}" />
-            <div class="username">${profilePost.User}</div>
-            <div class="badge" style="background-color:${badgeColor}">${profilePost.Role || 'User'}</div>
-          `;
-          document.getElementById("profileHeader").style.display = "block";
-        }
-
-        postList.forEach(mainPost => {
-          feed.appendChild(renderPost(mainPost));
-        });
-      } catch (e) {
-        document.getElementById("feed").textContent = "Failed to load posts.";
-        console.error(e);
       }
+    });
+
+    const feed = document.getElementById("feed");
+    feed.innerHTML = '';
+
+    function renderPost(post) {
+      const userImage = post["user-image"] && post["user-image"].trim() !== ""
+        ? post["user-image"]
+        : fallbackAvatar;
+
+      const badgeColor = roleColors[post.Role] || "#5865f2";
+      const badge = post.Role ? `
+        <span class="badge" title="${post.Role}" style="background-color: ${badgeColor}">
+          ${post.verified === "*" ? '<svg class="verified-icon" viewBox="0 0 16 16" width="12" height="12" xmlns="http://www.w3.org/2000/svg"><path d="M6.00039 11.2002L3.33372 8.53353L2.60039 9.26686L6.00039 12.6669L14.0004 4.66686L13.2671 3.93353L6.00039 11.2002Z"/></svg>' : ''}
+          ${post.Role}
+        </span>` : '';
+
+      const altText = post['alt-text'] || 'No description';
+      let imageHTML = '';
+      if (post.Image && post.url) {
+        imageHTML = `
+          <div class="image-container">
+            <a href="${post.url}" target="_blank"><img src="${post.Image}" class="image" alt="${altText}" /></a>
+            <span class="tooltip">${altText}</span>
+          </div>`;
+      } else if (post.Image) {
+        imageHTML = `
+          <div class="image-container">
+            <img src="${post.Image}" class="image" alt="${altText}" />
+            <span class="tooltip">${altText}</span>
+          </div>`;
+      }
+
+      const postEl = document.createElement("div");
+      postEl.className = `post${post.Image ? ' with-image' : ''}`;
+      postEl.innerHTML = `
+        <div class="post-header">
+          <img src="${userImage}" class="avatar" onerror="this.onerror=null;this.src='${fallbackAvatar}'" />
+          <span class="username-badge">
+            <a href="?posts=${encodeURIComponent(post.User)}" class="username" style="color:inherit; text-decoration:none;">${post.User}</a>
+            ${badge}
+          </span>
+        </div>
+        <div class="content">${post.Text}</div>
+        ${imageHTML}
+      `;
+
+      const replies = repliesMap[post.Text?.trim()];
+      if (replies && replies.length > 0) {
+        const repliesEl = document.createElement("div");
+        repliesEl.className = "replies";
+        replies.forEach(reply => {
+          repliesEl.appendChild(renderPost(reply));
+        });
+        postEl.appendChild(repliesEl);
+      }
+
+      return postEl;
     }
+
+    const postList = Object.values(postsMap).reverse();
+    if (isProfileView && postList.length > 0) {
+      const profilePost = postList[0];
+      const badgeColor = roleColors[profilePost.Role] || "#5865f2";
+      const userImage = profilePost["user-image"]?.trim() || fallbackAvatar;
+      document.getElementById("profileHeader").innerHTML = `
+        <img src="${userImage}" class="avatar" style="border-color:${badgeColor}" />
+        <div class="username">${profilePost.User}</div>
+        <div class="badge" style="background-color:${badgeColor}">${profilePost.Role || 'User'}</div>
+      `;
+      document.getElementById("profileHeader").style.display = "block";
+    }
+
+    postList.forEach(mainPost => {
+      feed.appendChild(renderPost(mainPost));
+    });
+  } catch (e) {
+    document.getElementById("feed").textContent = "Failed to load posts.";
+    console.error(e);
+  }
+}
 
     loadPosts();
     setInterval(loadPosts, 15000);
