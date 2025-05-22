@@ -186,6 +186,10 @@ function parseMarkdown(text) {
     .replace(
       /\{(.*?)\}\[(.*?)\]/g,
       '<span style="color:$2">$1</span>'
+    )
+    .replace(
+      /\!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g,
+      '<img src="$2" alt="$1">'
     );
 }
 
