@@ -149,6 +149,7 @@
   <script>
     const SHEET_ID = '1ikyDtsWpTu-CspRoKitH6nFtgnB8XPUXytJDc9Q1vO8';
 const SHEET_URL = `https://opensheet.elk.sh/${SHEET_ID}/Sheet1`;
+const API_NINJAS_KEY = 'audFnhc9Z9ZK3Xzc8W2VHQ==OgCqFBFjoebp0NMN'; // Replace with your actual key
 
 const roleColors = {
   "Youtuber": "#FF0000",
@@ -169,42 +170,43 @@ function getQueryParam(param) {
   return params.get(param);
 }
 
+async function getProfileViews(user) {
+  const counterId = `profile_${user}`;
+  try {
+    const res = await fetch(`https://api.api-ninjas.com/v1/counter?id=${counterId}&hit=true`, {
+      headers: { 'X-Api-Key': API_NINJAS_KEY }
+    });
+    const data = await res.json();
+    return data.value;
+  } catch (err) {
+    console.error('View counter error:', err);
+    return null;
+  }
+}
+
 async function loadPosts() {
   try {
     const res = await fetch(SHEET_URL);
     const data = await res.json();
 
     const usernameFilter = getQueryParam("posts");
-    const roleFilterRaw = getQueryParam("role");
-
-    // Normalize role filter for r/kirka special case
-    let roleFilter = null;
-    if (roleFilterRaw) {
-      roleFilter = roleFilterRaw.toLowerCase() === "rkirka" ? "r/kirka" : roleFilterRaw;
-    }
-
+    const roleFilter = getQueryParam("role");
     const isProfileView = !!usernameFilter;
-    const isRoleView = !!roleFilter;
 
     const postsMap = {};
     const repliesMap = {};
 
-    // Collect posts & replies by user or role filters
     data.forEach(post => {
       const isReply = post.ReplyTo && post.ReplyTo.trim() !== "";
-
-      // Filter logic for role pages
-      if (isRoleView && post.Role !== roleFilter) return;
-
-      // Filter logic for profile pages:
-      // Include any post (main or reply) by the user
-      if (isProfileView && post.User !== usernameFilter) return;
+      const key = isReply ? post.ReplyTo.trim() : post.Text.trim();
 
       if (isReply) {
-        if (!repliesMap[post.ReplyTo.trim()]) repliesMap[post.ReplyTo.trim()] = [];
-        repliesMap[post.ReplyTo.trim()].push(post);
+        if (!repliesMap[key]) repliesMap[key] = [];
+        repliesMap[key].push(post);
       } else {
-        postsMap[post.Text.trim()] = post;
+        const matchesUser = !usernameFilter || post.User === usernameFilter;
+        const roleMatch = !roleFilter || (post.Role?.replaceAll("/", "").toLowerCase() === roleFilter.toLowerCase());
+        if (matchesUser && roleMatch) postsMap[post.Text.trim()] = post;
       }
     });
 
@@ -212,16 +214,20 @@ async function loadPosts() {
     feed.innerHTML = '';
 
     function renderPost(post) {
-      const userImage = post["user-image"] && post["user-image"].trim() !== ""
-        ? post["user-image"]
-        : fallbackAvatar;
-
+      const userImage = post["user-image"]?.trim() || fallbackAvatar;
       const badgeColor = roleColors[post.Role] || "#5865f2";
-      const badge = post.Role ? `
-        <span class="badge" title="${post.Role}" style="background-color: ${badgeColor}; cursor:pointer;" onclick="window.location='?role=${encodeURIComponent(post.Role.toLowerCase() === 'r/kirka' ? 'rkirka' : post.Role)}'">
-          ${post.verified === "*" ? '<svg class="verified-icon" viewBox="0 0 16 16" width="12" height="12" xmlns="http://www.w3.org/2000/svg"><path d="M6.00039 11.2002L3.33372 8.53353L2.60039 9.26686L6.00039 12.6669L14.0004 4.66686L13.2671 3.93353L6.00039 11.2002Z"/></svg>' : ''}
-          ${post.Role}
-        </span>` : '';
+      let roleDisplay = post.Role;
+
+      // Make role clickable link
+      let badge = '';
+      if (roleDisplay) {
+        const urlRole = roleDisplay.replaceAll("/", "").replaceAll(" ", "");
+        badge = `
+          <a href="?role=${encodeURIComponent(urlRole)}" class="badge" title="${roleDisplay}" style="background-color: ${badgeColor}; text-decoration: none;">
+            ${post.verified === "*" ? '<svg class="verified-icon" viewBox="0 0 16 16" width="12" height="12" xmlns="http://www.w3.org/2000/svg"><path d="M6.00039 11.2002L3.33372 8.53353L2.60039 9.26686L6.00039 12.6669L14.0004 4.66686L13.2671 3.93353L6.00039 11.2002Z"/></svg>' : ''}
+            ${roleDisplay}
+          </a>`;
+      }
 
       const altText = post['alt-text'] || 'No description';
       let imageHTML = '';
@@ -253,7 +259,6 @@ async function loadPosts() {
         ${imageHTML}
       `;
 
-      // Render nested replies only if this post has replies
       const replies = repliesMap[post.Text?.trim()];
       if (replies && replies.length > 0) {
         const repliesEl = document.createElement("div");
@@ -267,51 +272,26 @@ async function loadPosts() {
       return postEl;
     }
 
-    // Combine main posts and replies (for profile view)
-    let combinedPosts = [];
+    const postList = Object.values(postsMap).reverse();
 
-    if (isProfileView) {
-      // For profile view, combine all posts and replies by user into one list and sort by date or order in sheet (if available)
-      // Since there is no date field in the sample, we use order from the sheet (data array order)
-      combinedPosts = data.filter(post => post.User === usernameFilter);
-    } else {
-      // For role view or default, just show postsMap values filtered by role or nothing else
-      combinedPosts = Object.values(postsMap);
-    }
-
-    // Reverse to show newest first
-    combinedPosts.reverse();
-
-    // Show profile header with total posts count for profile view
-    if (isProfileView && combinedPosts.length > 0) {
-      const profilePost = combinedPosts[0];
+    if (isProfileView && postList.length > 0) {
+      const profilePost = postList[0];
       const badgeColor = roleColors[profilePost.Role] || "#5865f2";
       const userImage = profilePost["user-image"]?.trim() || fallbackAvatar;
-      const totalPosts = combinedPosts.length;
+      const viewCount = await getProfileViews(usernameFilter);
 
       document.getElementById("profileHeader").innerHTML = `
         <img src="${userImage}" class="avatar" style="border-color:${badgeColor}" />
         <div class="username">${profilePost.User}</div>
         <div class="badge" style="background-color:${badgeColor}">${profilePost.Role || 'User'}</div>
-        <div style="margin-top: 6px; font-size: 0.9rem; color: #ccc;">
-          Total Posts (incl. replies): ${totalPosts}
-        </div>
+        <div style="font-size: 0.85rem; margin-top: 4px; color: #aaa;">Views: ${viewCount ?? 'N/A'} | Posts: ${postList.length}</div>
       `;
       document.getElementById("profileHeader").style.display = "block";
-    } else {
-      document.getElementById("profileHeader").style.display = "none";
     }
 
-    // Render all posts (and replies nested by renderPost)
-    combinedPosts.forEach(post => {
-      // To avoid duplicate display of replies as main posts (because replies are also included in combinedPosts),
-      // only render posts that are NOT replies or that have no ReplyTo field
-      // (because replies will be nested under their parent post)
-      if (post.ReplyTo && post.ReplyTo.trim() !== "") return;
-
-      feed.appendChild(renderPost(post));
+    postList.forEach(mainPost => {
+      feed.appendChild(renderPost(mainPost));
     });
-
   } catch (e) {
     document.getElementById("feed").textContent = "Failed to load posts.";
     console.error(e);
