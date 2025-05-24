@@ -12,16 +12,37 @@
   <style>
     body {
       margin: 0;
-      font-family: 'Segoe UI', sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #0d1117;
       color: #c9d1d9;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       min-height: 100vh;
-      text-align: center;
       padding: 2rem;
+      text-align: center;
+    }
+    header {
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 2rem;
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+    }
+    button {
+      background: #238636;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #2ea043;
     }
     .card {
       background: #161b22;
@@ -30,7 +51,7 @@
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
       max-width: 500px;
       width: 100%;
-      display: none;
+      display: none; /* Hide by default */
     }
     .avatar {
       width: 100px;
@@ -42,43 +63,57 @@
     }
     h1 {
       color: #58a6ff;
+      margin-bottom: 0.2rem;
     }
-    .invite-text {
+    .invite-code {
       font-size: 1.2rem;
-      margin: 1rem 0 0.5rem;
-    }
-    #joinBtn {
-      background: #238636;
-      border: none;
-      padding: 0.7rem 1.5rem;
-      border-radius: 8px;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 1rem;
-      margin-top: 1rem;
-      display: none;
+      background: #21262d;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      margin: 1rem 0;
+      display: inline-block;
+      color: #fff;
+      font-family: monospace;
+      user-select: all;
+      word-break: break-all;
     }
     .note {
       color: #8b949e;
       margin-top: 1rem;
       font-size: 0.9rem;
     }
+    .count {
+      margin-top: 1rem;
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: #58a6ff;
+    }
   </style>
 </head>
 <body>
+  <header>
+    <button id="inviteBtn">Invite Friends</button>
+    <button id="copyLinkBtn" style="display:none;">Copy Link</button>
+  </header>
 
-  <div class="card" id="inviteCard">
-    <img src="" class="avatar" alt="User Avatar" />
-    <h1>You've Been Invited!</h1>
-    <p class="invite-text"><strong></strong> invited you to join.</p>
-    <button id="joinBtn">Join Now</button>
-    <div class="note">Use the invite link provided to join the party!</div>
+  <div class="card" id="mainCard">
+    <img src="https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain" class="avatar" alt="User Avatar" />
+    <h1>You're Invited!</h1>
+    <p><strong id="inviterName"></strong> invited you.</p>
+    <div class="invite-code" id="inviteCode"></div>
+    <button id="joinBtn" style="display:none;">Join Now</button>
+    <div class="count" id="inviteCount"></div>
+    <div class="note">Use the invite link to join the party!</div>
   </div>
 
   <script>
-    // Helper: decode Base64 safely
-    function safeBase64Decode(str) {
+    const API_NINJAS_KEY = 'audFnhc9Z9ZK3Xzc8W2VHQ==OgCqFBFjoebp0NMN';
+
+    function b64EncodeUnicode(str) {
+      return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
+        (_, p1) => String.fromCharCode('0x' + p1)));
+    }
+    function b64DecodeUnicode(str) {
       try {
         return decodeURIComponent(atob(str).split('').map(c =>
           '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
@@ -88,75 +123,147 @@
       }
     }
 
-    // Update meta tags dynamically in the head (only client-side)
-    function updateMetaTags(userData) {
-      const head = document.getElementsByTagName('head')[0];
+    const urlParams = new URLSearchParams(window.location.search);
+    const encodedInviter = urlParams.get('invitedby');
 
-      function setMetaProperty(prop, content) {
-        let tag = document.querySelector(`meta[property='${prop}']`);
-        if (!tag) {
-          tag = document.createElement('meta');
-          tag.setAttribute('property', prop);
-          head.appendChild(tag);
-        }
-        tag.setAttribute('content', content);
+    const mainCard = document.getElementById('mainCard');
+    const inviteBtn = document.getElementById('inviteBtn');
+    const copyLinkBtn = document.getElementById('copyLinkBtn');
+    const joinBtn = document.getElementById('joinBtn');
+    const inviterNameEl = document.getElementById('inviterName');
+    const inviteCodeEl = document.getElementById('inviteCode');
+    const avatarEl = document.querySelector('.avatar');
+    const inviteCountEl = document.getElementById('inviteCount');
+
+    async function fetchUserData(username) {
+      const sheetUrl = 'https://opensheet.elk.sh/1ikyDtsWpTu-CspRoKitH6nFtgnB8XPUXytJDc9Q1vO8/Sheet1';
+      try {
+        const res = await fetch(sheetUrl);
+        const data = await res.json();
+        return data.find(entry => entry.User?.toLowerCase() === username.toLowerCase()) || null;
+      } catch {
+        return null;
       }
-
-      setMetaProperty('og:title', `You're Invited by ${userData.User || 'Someone'}!`);
-      setMetaProperty('og:description', `${userData.User || 'Someone'} invited you to join. Don't miss out!`);
-      setMetaProperty('og:image', userData["user-image"] || 'https://vectorified.com/images/google-sheets-icon-29.png');
-      setMetaProperty('og:url', window.location.href);
-      setMetaProperty('og:type', 'website');
     }
 
-    // Show invite card with user info
-    function showInviteCard(userData) {
-      const card = document.getElementById('inviteCard');
-      card.style.display = 'block';
-
-      const avatar = card.querySelector('.avatar');
-      avatar.src = userData["user-image"] || 'https://via.placeholder.com/100';
-
-      const inviterNameElem = card.querySelector('.invite-text strong');
-      inviterNameElem.textContent = userData.User || 'Unknown';
-
-      document.getElementById('joinBtn').style.display = 'inline-block';
-
-      updateMetaTags(userData);
+    async function getInviteCount(user) {
+      const counterId = `Invite_${user}`;
+      try {
+        const res = await fetch(`https://api.api-ninjas.com/v1/counter?id=${counterId}`, {
+          headers: { 'X-Api-Key': API_NINJAS_KEY }
+        });
+        const data = await res.json();
+        return data.value || 0;
+      } catch (err) {
+        console.error('Invite count fetch error:', err);
+        return 0;
+      }
     }
 
-    // Parse URL param "invitedby" which is base64 encoded username
-    const params = new URLSearchParams(window.location.search);
-    const encodedUser = params.get('invitedby');
-    if (!encodedUser) {
-      document.body.innerHTML = '<h2 style="color:#f85149;">Invalid or missing invite link.</h2>';
-    } else {
-      const decodedUser = safeBase64Decode(encodedUser);
-      if (!decodedUser) {
-        document.body.innerHTML = '<h2 style="color:#f85149;">Invalid invite user encoding.</h2>';
+    async function incrementInviteCount(user) {
+      const counterId = `Invite_${user}`;
+      try {
+        const res = await fetch(`https://api.api-ninjas.com/v1/counter?id=${counterId}&hit=true`, {
+          headers: { 'X-Api-Key': API_NINJAS_KEY }
+        });
+        const data = await res.json();
+        return data.value || 0;
+      } catch (err) {
+        console.error('Invite count increment error:', err);
+        return null;
+      }
+    }
+
+    async function updateInviteCountDisplay(user) {
+      const count = await getInviteCount(user);
+      inviteCountEl.textContent = `Invites: ${count}`;
+    }
+
+    async function setupInviteView(inviterUsername) {
+      if (!inviterUsername) {
+        mainCard.style.display = 'none';
+        return;
+      }
+      mainCard.style.display = 'block';
+      inviterNameEl.textContent = 'Loading...';
+      const userData = await fetchUserData(inviterUsername);
+      if (userData) {
+        inviterNameEl.textContent = userData.User || inviterUsername;
+        avatarEl.src = userData['user-image'] || 'https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain';
+        inviteCodeEl.textContent = b64EncodeUnicode(inviterUsername);
+        joinBtn.style.display = 'inline-block';
+        copyLinkBtn.style.display = 'inline-block';
+
+        // Update meta tags dynamically
+        document.querySelector('meta[property="og:title"]').setAttribute('content', `${userData.User} invited you!`);
+        document.querySelector('meta[property="og:description"]').setAttribute('content', `Join us now! Invited by ${userData.User}.`);
+        document.querySelector('meta[property="og:image"]').setAttribute('content', userData['user-image'] || 'https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain');
+        document.querySelector('meta[property="og:url"]').setAttribute('content', window.location.href);
       } else {
-        // Fetch Google Sheet data
-        fetch('https://opensheet.elk.sh/1ikyDtsWpTu-CspRoKitH6nFtgnB8XPUXytJDc9Q1vO8/Sheet1')
-          .then(res => res.json())
-          .then(data => {
-            const userData = data.find(entry => entry.User?.toLowerCase() === decodedUser.toLowerCase());
-            if (userData) {
-              showInviteCard(userData);
-            } else {
-              document.body.innerHTML = '<h2 style="color:#f85149;">User not found.</h2>';
-            }
-          })
-          .catch(() => {
-            document.body.innerHTML = '<h2 style="color:#f85149;">Error loading user data.</h2>';
-          });
+        inviterNameEl.textContent = inviterUsername;
+        avatarEl.src = 'https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain';
+        inviteCodeEl.textContent = b64EncodeUnicode(inviterUsername);
+        joinBtn.style.display = 'inline-block';
+        copyLinkBtn.style.display = 'inline-block';
       }
+      updateInviteCountDisplay(inviterUsername);
     }
 
-    // Join button click redirects to target page
-    document.getElementById('joinBtn').addEventListener('click', () => {
+    inviteBtn.addEventListener('click', () => {
+      const username = prompt('What is your Username?');
+      if (username && username.trim() !== '') {
+        const cleanName = username.trim();
+        const encoded = b64EncodeUnicode(cleanName);
+        const inviteUrl = `${window.location.origin}${window.location.pathname}?invitedby=${encoded}`;
+        inviteCodeEl.textContent = encoded;
+        inviterNameEl.textContent = cleanName;
+        avatarEl.src = 'https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain';
+        copyLinkBtn.style.display = 'inline-block';
+        joinBtn.style.display = 'inline-block';
+        mainCard.style.display = 'block';
+
+        document.querySelector('meta[property="og:title"]').setAttribute('content', `${cleanName} invited you!`);
+        document.querySelector('meta[property="og:description"]').setAttribute('content', `Join us now! Invited by ${cleanName}.`);
+        document.querySelector('meta[property="og:image"]').setAttribute('content', 'https://th.bing.com/th/id/OIP.K81q4IEp8QYUE4MJYSySZQAAAA?dpr=1.3&pid=ImgDetMain');
+        document.querySelector('meta[property="og:url"]').setAttribute('content', inviteUrl);
+
+        window.history.replaceState(null, '', `?invitedby=${encoded}`);
+
+        copyLinkBtn.dataset.link = inviteUrl;
+
+        updateInviteCountDisplay(cleanName);
+      }
+    });
+
+    copyLinkBtn.addEventListener('click', () => {
+      const link = copyLinkBtn.dataset.link || window.location.href;
+      navigator.clipboard.writeText(link).then(() => {
+        copyLinkBtn.textContent = 'Copied!';
+        setTimeout(() => copyLinkBtn.textContent = 'Copy Link', 1500);
+      }).catch(() => {
+        alert('Failed to copy link.');
+      });
+    });
+
+    joinBtn.addEventListener('click', async () => {
+      if (!encodedInviter) return window.location.href = 'https://kirka-feed.github.io/Social/';
+      const decodedUser = b64DecodeUnicode(encodedInviter);
+      if (decodedUser) {
+        await incrementInviteCount(decodedUser);
+      }
       window.location.href = 'https://kirka-feed.github.io/Social/';
     });
-  </script>
 
+    // On page load
+    if (encodedInviter) {
+      const decodedUser = b64DecodeUnicode(encodedInviter);
+      setupInviteView(decodedUser);
+    } else {
+      // No invite code: hide card
+      mainCard.style.display = 'none';
+      copyLinkBtn.style.display = 'none';
+      joinBtn.style.display = 'none';
+    }
+  </script>
 </body>
 </html>
